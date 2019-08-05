@@ -41,13 +41,13 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
 
 //                .access("hasAnyAuthority('USER','ADMIN')")
 //                .antMatchers("/admin").access("hasAuthority('ADMIN')")
-                .anyRequest().authenticated()
-                .and()
-                .formLogin().loginPage("/login").permitAll()
+                .anyRequest().permitAll()
+                //.and()
+                //.formLogin().loginPage("/login").permitAll()
                 .and()
                 .logout()
                 .logoutRequestMatcher(new AntPathRequestMatcher("/logout"))
-                .logoutSuccessUrl("/login").permitAll()
+                .logoutSuccessUrl("/list").permitAll()
                 .and()
                 .httpBasic();
         http

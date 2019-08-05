@@ -4,8 +4,10 @@ import com.example.demo.business.entities.Message;
 import com.example.demo.business.entities.User;
 import org.springframework.data.repository.CrudRepository;
 
-public interface MessageRepository extends CrudRepository<Message, Long> {
-    Iterable<Message> findAllByUser(User user);
+import java.util.ArrayList;
 
-    Iterable<Message> findAllByOrderByPostedDateTimeDesc();
+public interface MessageRepository extends CrudRepository<Message, Long> {
+    ArrayList<Message> findAllByUser(User user);
+
+    ArrayList<Message> findAllByOrderByPostedDateTimeDesc();
 }

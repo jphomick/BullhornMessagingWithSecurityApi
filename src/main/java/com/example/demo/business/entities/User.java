@@ -1,6 +1,10 @@
 package com.example.demo.business.entities;
 
 import com.example.demo.business.util.ValidPassword;
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 
 import javax.persistence.*;
 import javax.validation.constraints.AssertTrue;
@@ -53,9 +57,11 @@ public class User {
 
     //For followers and following
     @ManyToMany
+    @JsonIgnore
     private Set<User> followings;
 
     @ManyToMany(mappedBy = "followings")
+    @JsonIgnore
     private Set<User> followers;
 
     public User() {

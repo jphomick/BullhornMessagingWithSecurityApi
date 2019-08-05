@@ -1,5 +1,6 @@
 package com.example.demo.business.entities;
 
+import com.fasterxml.jackson.annotation.*;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.lang.NonNull;
 
@@ -38,6 +39,7 @@ public class Message {
     private String picturePath;
 
     @ManyToOne
+    @JsonIgnore
     private User user;
 
     public Message() {

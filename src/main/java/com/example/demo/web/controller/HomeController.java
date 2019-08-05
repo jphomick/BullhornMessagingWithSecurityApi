@@ -9,7 +9,9 @@ import com.example.demo.business.services.CloudinaryConfig;
 import com.example.demo.business.services.CustomerUserDetails;
 import com.example.demo.business.services.UserService;
 import com.example.demo.business.util.MD5Util;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -17,13 +19,16 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import javax.validation.Valid;
 import java.io.IOException;
+import java.net.URI;
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Map;
 
-@Controller
+@RestController
 public class HomeController {
     @Autowired
     MessageRepository messageRepository;
@@ -37,50 +42,19 @@ public class HomeController {
     @Autowired
     UserService userService;
 
-    //Users with Admin role can view this page
-    @RequestMapping("/admin")
-    public String admin(Model model) {
-        model.addAttribute("users", userRepository.findAll());
-        model.addAttribute("mD5Util", new MD5Util());
-        return "admin";
-    }
-
-    @RequestMapping("/")
-    public String listMessages(Model model) {
-        model.addAttribute("messages", messageRepository.findAllByOrderByPostedDateTimeDesc());//generate select * statement
-        //we need because the below statement wont run if there is no authenticate user
-        if (userService.getUser() != null) {
-            model.addAttribute("user", userService.getUser());
-//            model.addAttribute("HASH", MD5Util.md5Hex(userService.getUser().getEmail()));
-        }
-        model.addAttribute("mD5Util", new MD5Util());
-        return "list";
-    }
-
-    @GetMapping("/add")
-    public String messageForm(Principal principal, Model model) {
-        model.addAttribute("imageLabel", "Upload Image");
-        model.addAttribute("user", userService.getUser());
-        model.addAttribute("message", new Message());
-        return "messageform";
+    @RequestMapping("/list")
+    public @ResponseBody ArrayList<Message> listMessages() {
+        ObjectMapper mapper = new ObjectMapper();
+        ArrayList<Message> messages = new ArrayList<>();
+        return messageRepository.findAllByOrderByPostedDateTimeDesc();
     }
 
     @PostMapping("/process")
-    public String processForm(@Valid @ModelAttribute("message") Message message,
-                              BindingResult result,
-                              @RequestParam("file") MultipartFile file,
-                              Model model) {
-        model.addAttribute("imageLabel", "Upload Image");
-        model.addAttribute("user", userService.getUser());
-        //check for errors on the form
-        if (result.hasErrors()) {
-            for (ObjectError e : result.getAllErrors()) {
-                System.out.println(e);
-            }
-            return "messageform";
-        }
+    public @ResponseBody boolean processForm(Message message, @RequestParam("file") MultipartFile file) {
 
-        if (!file.isEmpty()) {
+        message.setUser(userService.getUser());
+
+        if (file != null && !file.isEmpty()) {
             try {
                 Map uploadResult = cloudc.upload(
                         file.getBytes(), ObjectUtils.asMap("resourcetype", "auto"));
@@ -88,89 +62,50 @@ public class HomeController {
                 String uploadedName = uploadResult.get("public_id").toString();
                 String transformedImage = cloudc.createUrl(uploadedName, 150, 150);
                 message.setPicturePath(transformedImage);
-                message.setUser(userService.getUser());
             } catch (IOException e) {
                 e.printStackTrace();
-                return "redirect:/add";
-            }
-        } else {
-            //if file is empty and there is a picture path then save item
-            if (message.getPicturePath().isEmpty()) {
-                return "messageform";
+                return false;
             }
         }
+
         messageRepository.save(message);
-        return "redirect:/";
+
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}")
+                .buildAndExpand(message.getId()).toUri();
+
+        return true;
     }
 
-    @RequestMapping("/detail/{id}")
-    public String showMessage(@PathVariable("id") long id, Model model) {
-        model.addAttribute("message", messageRepository.findById(id).get());
-        if (userService.getUser() != null) {
-            model.addAttribute("user_id", userService.getUser().getId());
+    @RequestMapping("/get_current")
+    public @ResponseBody String follow() {
+        try {
+            return new ObjectMapper().writeValueAsString(userService.getUser());
+        } catch (Exception e) {
+            return "";
         }
-        return "show";
     }
 
-    @RequestMapping("/update/{id}")
-    public String updateMessage(@PathVariable("id") long id, Model model) {
-        model.addAttribute("message", messageRepository.findById(id).get());
-        if (userService.getUser() != null) {
-            model.addAttribute("user", userService.getUser());
+    @RequestMapping("/get_user_{id}")
+    public @ResponseBody String getUser(@PathVariable("id") long id) {
+        try {
+            return new ObjectMapper().writeValueAsString(userRepository.findById(id).get());
+        } catch (Exception e) {
+            return "";
         }
-        return "messageform";
     }
 
-    @RequestMapping("/delete/{id}")
-    public String deleteMessage(@PathVariable("id") long id) {
+    @RequestMapping("/get_{id}")
+    public @ResponseBody String showMessage(@PathVariable("id") long id) {
+        try {
+            return new ObjectMapper().writeValueAsString(messageRepository.findById(id).get());
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    @RequestMapping("/delete_{id}")
+    public @ResponseBody String check(@PathVariable("id") long id) {
         messageRepository.deleteById(id);
-        return "redirect:/";
-    }
-
-    @PostMapping("/check")
-    public String check(@RequestParam("check") long[] ids,
-                        Model model) {
-        for (long id : ids) {
-            messageRepository.deleteById(id);
-        }
-        return "redirect:/";
-    }
-
-    @GetMapping("/about")
-    public String getAbout() {
-        return "about";
-    }
-
-    @RequestMapping("/myprofile")
-    public String getProfile(Principal principal, Model model) {
-        User user = userService.getUser();
-        model.addAttribute("user", user);
-        model.addAttribute("myuser", user);
-        model.addAttribute("HASH", MD5Util.md5Hex(user.getEmail()));
-        return "profile";
-    }
-
-    @RequestMapping("/user/{id}")
-    public String getUser(@PathVariable("id") long id, Model model) {
-        User user = userRepository.findById(id).get();
-        model.addAttribute("user", user);
-        model.addAttribute("myuser", userService.getUser());
-        model.addAttribute("HASH", MD5Util.md5Hex(user.getEmail())); //save every person email as hash
-        return "profile";
-    }
-
-    //AUXILLARY FUNCTION!!!
-    //Use the below code INSIDE METHOD to pass user into view
-    @RequestMapping("/secure")
-    public String secure(Principal principal, Model model) {
-
-        User myuser = ((CustomerUserDetails)
-                ((UsernamePasswordAuthenticationToken) principal)
-                        .getPrincipal())
-                .getUser();
-        //or
-        myuser = userService.getUser();
-        model.addAttribute("myuser", myuser);
-        return "secure";
+        return "Deleted";
     }
 }
